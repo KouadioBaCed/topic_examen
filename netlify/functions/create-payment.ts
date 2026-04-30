@@ -12,7 +12,9 @@ interface CreatePaymentBody {
   paymentMethod?: 'wave' | 'orange_money' | 'mtn_money' | 'moov_money' | 'card' | 'checkout';
 }
 
-const COURSE_PRICE = 200000;
+// TEST PRODUCTION — montant abaissé temporairement au minimum GeniusPay (200 XOF).
+// Remettre à 200000 une fois les tests validés.
+const COURSE_PRICE = 200;
 const ALLOWED_METHODS = ['wave', 'orange_money', 'mtn_money', 'moov_money', 'card'] as const;
 
 export default async (req: Request) => {

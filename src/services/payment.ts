@@ -2,7 +2,10 @@ import type { CertificationSlug, CourseSubscription, AppUser } from '../types';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
-export const COURSE_PRICE_XOF = 200000;
+// TEST PRODUCTION — montant abaissé temporairement au minimum GeniusPay (200 XOF).
+// Remettre à 200000 une fois les tests validés. Doit rester aligné avec
+// COURSE_PRICE dans netlify/functions/create-payment.ts.
+export const COURSE_PRICE_XOF = 200;
 export const SUBSCRIPTION_DURATION_DAYS = 30;
 
 export interface CreatePaymentParams {
