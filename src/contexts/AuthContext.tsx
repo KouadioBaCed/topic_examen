@@ -19,6 +19,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshAppUser: () => Promise<AppUser | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -101,7 +102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         email: cred.user.email!,
         displayName,
         role: 'user',
-        isActive: false,
+        isActive: true,
         allowedCourses: [] as CertificationSlug[],
         createdAt: now.toISOString(),
         expiresAt: expiresAt.toISOString(),
@@ -121,8 +122,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAppUser(null);
   };
 
+  const refreshAppUser = async (): Promise<AppUser | null> => {
+    if (!firebaseUser) return null;
+    const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+    if (!userDoc.exists()) return null;
+    const data = userDoc.data() as AppUser;
+    data.allowedCourses = normalizeAllowedCourses(data.allowedCourses);
+    setAppUser(data);
+    return data;
+  };
+
   return (
-    <AuthContext.Provider value={{ firebaseUser, appUser, loading, error, login, register, logout }}>
+    <AuthContext.Provider value={{ firebaseUser, appUser, loading, error, login, register, logout, refreshAppUser }}>
       {children}
     </AuthContext.Provider>
   );

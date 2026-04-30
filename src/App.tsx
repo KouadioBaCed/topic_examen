@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Layout } from './components/layout';
 import { ProtectedRoute, AdminRoute } from './components/auth';
-import { HomePage, TopicsPage, TopicDetailPage, QuestionPage, ExamPage, LoginPage, AdminPage, DashboardPage, ExamReviewPage, PrivacyAndTermsPage } from './pages';
+import { HomePage, TopicsPage, TopicDetailPage, QuestionPage, ExamPage, LoginPage, AdminPage, DashboardPage, ExamReviewPage, PrivacyAndTermsPage, PaymentSuccessPage, PaymentErrorPage } from './pages';
 
 function App() {
   return (
@@ -9,6 +9,8 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/privacy" element={<PrivacyAndTermsPage />} />
+        <Route path="/payment/success" element={<PaymentSuccessPage />} />
+        <Route path="/payment/error" element={<PaymentErrorPage />} />
         {/* HomePage is public - no auth required */}
         <Route path="/" element={<Layout />}>
           <Route index element={<HomePage />} />

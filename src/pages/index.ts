@@ -8,3 +8,5 @@ export { AdminPage } from './AdminPage';
 export { DashboardPage } from './DashboardPage';
 export { ExamReviewPage } from './ExamReviewPage';
 export { default as PrivacyAndTermsPage } from './PrivacyAndTermsPage';
+export { PaymentSuccessPage } from './PaymentSuccessPage';
+export { PaymentErrorPage } from './PaymentErrorPage';

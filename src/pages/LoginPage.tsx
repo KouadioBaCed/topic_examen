@@ -1,23 +1,29 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
-import { LogIn, UserPlus, Mail, Lock, User, Loader2, CheckCircle, Sparkles, Phone } from 'lucide-react';
+import { Navigate, useSearchParams } from 'react-router-dom';
+import { LogIn, UserPlus, Mail, Lock, User, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useStore } from '../store/useStore';
 import { t } from '../i18n';
-
-const ADMIN_PHONE = '+225 0708916464';
-const ADMIN_WHATSAPP_URL = 'https://wa.me/2250708916464';
+import { certifications } from '../data/certifications';
 
 export const LoginPage = () => {
   const { firebaseUser, appUser, loading, login, register } = useAuth();
   const { lang } = useStore();
+  const [searchParams] = useSearchParams();
+  const certParam = searchParams.get('cert');
+  const targetCert = certParam ? certifications.find(c => c.slug === certParam) : null;
+
+  // Where to send the user after login/register: paywall for the requested course, or homepage.
+  const postAuthPath = targetCert
+    ? `/topics?cert=${targetCert.slug}&pay=1`
+    : '/';
+
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('register');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [registered, setRegistered] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [clickedTerms, setClickedTerms] = useState(false);
   const [clickedPrivacy, setClickedPrivacy] = useState(false);
@@ -31,7 +37,7 @@ export const LoginPage = () => {
   }
 
   if (firebaseUser && appUser) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={postAuthPath} replace />;
   }
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -61,52 +67,13 @@ export const LoginPage = () => {
     setSubmitting(true);
     try {
       await register(email, password, displayName);
-      setRegistered(true);
+      // Redirection automatique gérée par le <Navigate /> dès que appUser est chargé.
     } catch {
       setFormError(t(lang, 'registerError'));
     } finally {
       setSubmitting(false);
     }
   };
-
-  if (registered) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-dark-900 via-dark-800 to-primary-900 px-4">
-        <div className="card p-8 max-w-md w-full text-center">
-          <CheckCircle className="w-16 h-16 text-success mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-dark-900 dark:text-white mb-2">
-            {t(lang, 'accountCreated')}
-          </h2>
-          <p className="text-dark-600 dark:text-dark-400 mb-4">
-            {t(lang, 'accountCreatedDesc')}
-          </p>
-
-          {/* Contact admin */}
-          <div className="p-4 rounded-xl bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 mb-6">
-            <p className="text-sm font-medium text-primary-800 dark:text-primary-300 mb-3">
-              {t(lang, 'contactAdminToActivate')}
-            </p>
-            <a
-              href={ADMIN_WHATSAPP_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium text-sm transition-colors"
-            >
-              <Phone className="w-4 h-4" />
-              WhatsApp : {ADMIN_PHONE}
-            </a>
-          </div>
-
-          <button
-            onClick={() => { setRegistered(false); setActiveTab('login'); }}
-            className="btn-primary"
-          >
-            {t(lang, 'backToLogin')}
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-dark-900 via-dark-800 to-primary-900 px-4">
@@ -121,6 +88,22 @@ export const LoginPage = () => {
             </h1>
           </div>
         </div>
+
+        {targetCert && (
+          <div className="mb-4 p-4 rounded-xl bg-primary-500/10 border border-primary-400/30 text-center">
+            <p className="text-xs uppercase tracking-wider text-primary-300 font-semibold mb-1">
+              {lang === 'fr' ? 'Souscription au cours' : 'Subscribing to'}
+            </p>
+            <p className="text-white font-bold">
+              {targetCert.fullName || targetCert.name}
+            </p>
+            <p className="text-xs text-primary-200 mt-1">
+              {lang === 'fr'
+                ? "Créez votre compte puis effectuez le paiement (200 000 FCFA / mois) pour activer l'accès."
+                : 'Create your account, then pay (200,000 XOF / month) to activate access.'}
+            </p>
+          </div>
+        )}
 
         <div className="card p-6 sm:p-8">
           {/* Tabs */}

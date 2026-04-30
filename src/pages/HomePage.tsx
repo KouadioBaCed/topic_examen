@@ -22,8 +22,12 @@ import {
   Quote,
   TrendingUp,
   Trophy,
+  Lock,
 } from 'lucide-react';
 import { certifications, getCertificationStats } from '../data/certifications';
+import { PaymentModal } from '../components/payment';
+import { COURSE_PRICE_XOF, formatPriceXof } from '../services/payment';
+import type { Certification, CertificationSlug } from '../types';
 
 const testimonials = [
   {
@@ -221,6 +225,7 @@ const FloatingParticles = () => {
 export const HomePage = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [paymentTarget, setPaymentTarget] = useState<Certification | null>(null);
   const { lang } = useStore();
   const { appUser } = useAuth();
 
@@ -332,10 +337,8 @@ export const HomePage = () => {
                   const allGroupCerts = group.slugs
                     .map(s => certifications.find(c => c.slug === s))
                     .filter(Boolean) as typeof certifications;
-                  // For logged-in users, only show certs they have access to
-                  const groupCerts = appUser
-                    ? allGroupCerts.filter(c => appUser.allowedCourses.includes(c.slug))
-                    : allGroupCerts;
+                  // Show all certs; locked ones get a payment trigger for logged-in users
+                  const groupCerts = allGroupCerts;
                   if (groupCerts.length === 0) return null;
                   const IconComp = group.icon;
                   return (
@@ -352,7 +355,10 @@ export const HomePage = () => {
                       </div>
                       <div className="flex flex-wrap gap-1.5">
                         {groupCerts.map((cert, certIndex) => {
-                          const dest = appUser ? `/topics?cert=${cert.slug}` : '/login';
+                          const isAuthorized = !!appUser?.allowedCourses?.includes(cert.slug as CertificationSlug);
+                          const dest = appUser
+                            ? (isAuthorized ? `/topics?cert=${cert.slug}` : `/login?cert=${cert.slug}`)
+                            : `/login?cert=${cert.slug}`;
                           const colorMap: Record<string, string> = {
                             primary: 'bg-primary-500/15 text-primary-300 border-primary-500/25 hover:bg-primary-500/30 hover:border-primary-400/40 hover:shadow-[0_0_12px_rgba(59,130,246,0.15)]',
                             success: 'bg-primary-500/15 text-primary-300 border-primary-500/25 hover:bg-primary-500/30 hover:border-primary-400/40 hover:shadow-[0_0_12px_rgba(59,130,246,0.15)]',
@@ -363,13 +369,33 @@ export const HomePage = () => {
                           const displayName = cert.slug === 'pl-300' ? 'Microsoft PowerBI'
                             : cert.slug === 'mos-excel' ? 'MOS Excel'
                             : cert.name;
+                          const tooltip = appUser && !isAuthorized
+                            ? `${cert.fullName} — ${formatPriceXof(COURSE_PRICE_XOF)} / ${lang === 'fr' ? 'mois' : 'month'}`
+                            : cert.fullName;
+                          const baseClasses = `px-2.5 py-1 rounded-lg ${colors} text-xs sm:text-sm font-semibold border hover:scale-105 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer inline-flex items-center gap-1 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`;
+                          const style = { transitionDelay: `${750 + groupIndex * 150 + certIndex * 60}ms` };
+                          if (appUser && !isAuthorized) {
+                            return (
+                              <button
+                                key={cert.slug}
+                                type="button"
+                                title={tooltip}
+                                onClick={() => setPaymentTarget(cert)}
+                                className={baseClasses}
+                                style={style}
+                              >
+                                <Lock className="w-3 h-3" />
+                                {displayName}
+                              </button>
+                            );
+                          }
                           return (
                             <Link
                               key={cert.slug}
                               to={dest}
-                              title={cert.fullName}
-                              className={`px-2.5 py-1 rounded-lg ${colors} text-xs sm:text-sm font-semibold border hover:scale-105 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}
-                              style={{ transitionDelay: `${750 + groupIndex * 150 + certIndex * 60}ms` }}
+                              title={tooltip}
+                              className={baseClasses}
+                              style={style}
                             >
                               {displayName}
                             </Link>
@@ -701,6 +727,13 @@ export const HomePage = () => {
           </div> */}
         </div>
       </footer>
+
+      {paymentTarget && (
+        <PaymentModal
+          certification={paymentTarget}
+          onClose={() => setPaymentTarget(null)}
+        />
+      )}
     </div>
   );
 };

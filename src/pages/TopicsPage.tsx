@@ -34,7 +34,10 @@ import { socialgproFullExams, totalSocialgproFullExamQuestions } from '../data/s
 import { mealdproFullExams, totalMealdproFullExamQuestions } from '../data/mealdpro_full_exams';
 import { pgdproFullExams, totalPgdproFullExamQuestions } from '../data/pgdpro_full_exams';
 import { useStore } from '../store/useStore';
-import type { Category } from '../types';
+import type { Category, Certification } from '../types';
+import { PaymentModal } from '../components/payment';
+import { COURSE_PRICE_XOF, formatPriceXof } from '../services/payment';
+import type { Lang } from '../i18n';
 
 // Domain icon map
 const domainIconMap: Record<string, React.ElementType> = {
@@ -303,6 +306,114 @@ const FormulaFlashcard = ({
   );
 };
 
+// Paywall shown when a logged-in user opens a course they have not subscribed to.
+const CoursePaywall = ({ certification, lang }: { certification: Certification; lang: Lang }) => {
+  const [showModal, setShowModal] = useState(false);
+  const [searchParams] = useSearchParams();
+  const autoOpen = searchParams.get('pay') === '1';
+
+  useEffect(() => {
+    if (autoOpen) setShowModal(true);
+  }, [autoOpen]);
+
+  const labels = lang === 'fr'
+    ? {
+        title: 'Souscription requise',
+        subtitle: "Cette certification nécessite un abonnement actif. Souscrivez maintenant pour débloquer 30 jours d'accès complet.",
+        priceLabel: 'Tarif',
+        durationLabel: 'Durée',
+        durationValue: '1 mois (30 jours)',
+        cta: 'Souscrire — ' + formatPriceXof(COURSE_PRICE_XOF),
+        back: 'Retour aux certifications',
+        included: 'Inclus dans votre abonnement',
+        feat1: 'Accès illimité aux cours et guides PDF',
+        feat2: 'Examens blancs et mini-examens',
+        feat3: 'Suivi de votre progression et historique',
+        feat4: 'Renouvelable mois par mois',
+      }
+    : {
+        title: 'Subscription required',
+        subtitle: 'This certification requires an active subscription. Subscribe now to unlock 30 days of full access.',
+        priceLabel: 'Price',
+        durationLabel: 'Duration',
+        durationValue: '1 month (30 days)',
+        cta: 'Subscribe — ' + formatPriceXof(COURSE_PRICE_XOF),
+        back: 'Back to certifications',
+        included: 'Included with your subscription',
+        feat1: 'Unlimited access to courses and PDF guides',
+        feat2: 'Mock exams and quick exams',
+        feat3: 'Progress tracking and history',
+        feat4: 'Renewable month by month',
+      };
+
+  const Icon = iconMap[certification.icon] || Shield;
+
+  return (
+    <div className="min-h-screen bg-dark-50 dark:bg-dark-950 px-4 py-8 sm:py-12">
+      <div className="max-w-3xl mx-auto">
+        <Link to="/topics" className="inline-flex items-center gap-2 text-sm text-dark-600 dark:text-dark-400 hover:text-primary-600 dark:hover:text-primary-400 mb-6">
+          <ChevronLeft className="w-4 h-4" />
+          {labels.back}
+        </Link>
+
+        <div className="card overflow-hidden">
+          <div className="px-6 py-8 sm:px-10 sm:py-10 bg-gradient-to-br from-primary-500 to-primary-700 text-white relative">
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                <Icon className="w-7 h-7" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 text-xs font-semibold mb-2">
+                  <Lock className="w-3 h-3" />
+                  {labels.title}
+                </div>
+                <h1 className="text-xl sm:text-2xl font-bold mb-1">{certification.fullName || certification.name}</h1>
+                <p className="text-sm text-white/85">{labels.subtitle}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-6 py-6 sm:px-10 sm:py-8">
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              <div className="rounded-xl border border-dark-200 dark:border-dark-700 bg-dark-50 dark:bg-dark-800/50 p-4">
+                <p className="text-[11px] uppercase tracking-wider text-dark-500 dark:text-dark-400 font-semibold mb-1">{labels.priceLabel}</p>
+                <p className="text-2xl font-bold text-dark-900 dark:text-white">{formatPriceXof(COURSE_PRICE_XOF)}</p>
+              </div>
+              <div className="rounded-xl border border-dark-200 dark:border-dark-700 bg-dark-50 dark:bg-dark-800/50 p-4">
+                <p className="text-[11px] uppercase tracking-wider text-dark-500 dark:text-dark-400 font-semibold mb-1">{labels.durationLabel}</p>
+                <p className="text-2xl font-bold text-dark-900 dark:text-white">{labels.durationValue}</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800/40 p-5 mb-6">
+              <p className="text-sm font-semibold text-primary-900 dark:text-primary-200 mb-3">{labels.included}</p>
+              <ul className="space-y-2 text-sm text-primary-800 dark:text-primary-300">
+                <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />{labels.feat1}</li>
+                <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />{labels.feat2}</li>
+                <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />{labels.feat3}</li>
+                <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />{labels.feat4}</li>
+              </ul>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowModal(true)}
+              className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-bold text-base shadow-lg shadow-primary-500/30 transition-colors"
+            >
+              <Wallet className="w-5 h-5" />
+              {labels.cta}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {showModal && (
+        <PaymentModal certification={certification} onClose={() => setShowModal(false)} />
+      )}
+    </div>
+  );
+};
+
 export const TopicsPage = () => {
   const [searchParams] = useSearchParams();
   const certFilter = searchParams.get('cert');
@@ -313,9 +424,13 @@ export const TopicsPage = () => {
   // Check if the cert exists in our certifications data
   const certExists = certFilter ? certifications.some(c => c.slug === certFilter) : false;
 
-  // Redirect if cert doesn't exist or user doesn't have access
-  if (certFilter && (!certExists || !allowedCourses.includes(certFilter as CertificationSlug))) {
+  // Redirect only if the cert slug is unknown. If the user lacks access, show paywall instead.
+  if (certFilter && !certExists) {
     return <Navigate to="/topics" replace />;
+  }
+  if (certFilter && !allowedCourses.includes(certFilter as CertificationSlug)) {
+    const certForPaywall = certifications.find(c => c.slug === certFilter)!;
+    return <CoursePaywall certification={certForPaywall} lang={lang} />;
   }
 
   // Terminology states

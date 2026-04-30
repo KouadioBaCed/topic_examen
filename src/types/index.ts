@@ -133,6 +133,16 @@ export type UserRole = 'user' | 'admin';
 export type CertificationSlug = 'cfe' | 'cia-1' | 'cia-2' | 'cia-3' | 'cisa' | 'pmp' | 'capm' | 'pm4ngos' | 'pl-300'
   | 'social-good-dpro' | 'program-dpro' | 'finance-dpro' | 'meal-dpro' | 'mos-excel';
 
+export interface CourseSubscription {
+  courseSlug: CertificationSlug;
+  reference: string;
+  amount: number;
+  currency: string;
+  paidAt: string;
+  expiresAt: string;
+  paymentMethod?: string | null;
+}
+
 export interface AppUser {
   uid: string;
   email: string;
@@ -142,6 +152,7 @@ export interface AppUser {
   allowedCourses: CertificationSlug[];
   createdAt: string;
   expiresAt: string;
+  courseSubscriptions?: CourseSubscription[];
 }
 
 export interface StoredExamAnswer {
