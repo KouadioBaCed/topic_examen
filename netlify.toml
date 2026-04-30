@@ -3,6 +3,12 @@
   publish = "dist"
   functions = "netlify/functions"
 
+[build.environment]
+  # Les clés Firebase Web sont publiques par conception (la sécurité passe par les
+  # Firestore Security Rules et les domaines autorisés). Le scanner Netlify les
+  # détecte dans le bundle, mais ce n'est pas une fuite — on les exclut ici.
+  SECRETS_SCAN_OMIT_KEYS = "VITE_FIREBASE_API_KEY,VITE_FIREBASE_AUTH_DOMAIN,VITE_FIREBASE_PROJECT_ID,VITE_FIREBASE_STORAGE_BUCKET,VITE_FIREBASE_MESSAGING_SENDER_ID,VITE_FIREBASE_APP_ID"
+
 [functions]
   node_bundler = "esbuild"
 
