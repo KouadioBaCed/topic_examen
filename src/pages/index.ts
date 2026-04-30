@@ -10,3 +10,4 @@ export { ExamReviewPage } from './ExamReviewPage';
 export { default as PrivacyAndTermsPage } from './PrivacyAndTermsPage';
 export { PaymentSuccessPage } from './PaymentSuccessPage';
 export { PaymentErrorPage } from './PaymentErrorPage';
+export { SubscribePage } from './SubscribePage';

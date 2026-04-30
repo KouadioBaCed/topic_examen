@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams, Navigate } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, Loader2, AlertTriangle, ArrowRight, RefreshCw, Clock } from 'lucide-react';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useStore } from '../store/useStore';
 import { certifications } from '../data/certifications';
@@ -9,7 +12,71 @@ import {
   grantCourseAccessAfterPayment,
   formatPriceXof,
 } from '../services/payment';
-import type { CertificationSlug } from '../types';
+import { PENDING_SIGNUP_PREFIX } from './SubscribePage';
+import type { AppUser, CertificationSlug, CourseSubscription } from '../types';
+
+interface PendingSignup {
+  email: string;
+  password: string;
+  displayName: string;
+  phone?: string;
+  courseSlug: CertificationSlug;
+  tempUid: string;
+}
+
+async function createAccountAndGrantAccess(
+  pending: PendingSignup,
+  reference: string,
+  amount: number,
+  currency: string,
+  paymentMethod?: string | null,
+  completedAt?: string | null,
+): Promise<void> {
+  // Connexion préalable si l'email existe déjà (cas du rechargement de la page de succès).
+  let uid: string;
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, pending.email, pending.password);
+    await updateProfile(cred.user, { displayName: pending.displayName });
+    uid = cred.user.uid;
+  } catch (err) {
+    const code = (err as { code?: string }).code;
+    if (code === 'auth/email-already-in-use') {
+      const cred = await signInWithEmailAndPassword(auth, pending.email, pending.password);
+      uid = cred.user.uid;
+    } else {
+      throw err;
+    }
+  }
+
+  const now = new Date();
+  const expiresAt = new Date(now);
+  expiresAt.setDate(expiresAt.getDate() + 30);
+
+  const subscription: CourseSubscription = {
+    courseSlug: pending.courseSlug,
+    reference,
+    amount,
+    currency: currency || 'XOF',
+    paidAt: completedAt || now.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+    paymentMethod: paymentMethod ?? null,
+  };
+
+  const userData: AppUser = {
+    uid,
+    email: pending.email,
+    displayName: pending.displayName,
+    role: 'user',
+    isActive: true,
+    allowedCourses: [pending.courseSlug],
+    createdAt: now.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+    courseSubscriptions: [subscription],
+  };
+
+  // setDoc en merge=false (création) — si le doc existe déjà (rechargement), on l'écrase proprement.
+  await setDoc(doc(db, 'users', uid), userData);
+}
 
 type Status = 'verifying' | 'granted' | 'pending' | 'failed' | 'invalid';
 
@@ -36,7 +103,6 @@ export const PaymentSuccessPage = () => {
   useEffect(() => {
     let cancelled = false;
     async function run() {
-      if (!firebaseUser) return;
       if (!reference) {
         setStatus('invalid');
         return;
@@ -53,9 +119,35 @@ export const PaymentSuccessPage = () => {
         }
 
         if (tx.status === 'completed') {
-          const uid = appUser?.uid || firebaseUser.uid;
-          await grantCourseAccessAfterPayment(uid, courseSlug, tx);
-          await refreshAppUser();
+          // Cas A: nouvelle inscription en attente — on crée le compte Firebase MAINTENANT.
+          const pendingRaw = sessionStorage.getItem(PENDING_SIGNUP_PREFIX + tx.reference);
+          if (pendingRaw && !firebaseUser) {
+            const pending = JSON.parse(pendingRaw) as PendingSignup;
+            await createAccountAndGrantAccess(
+              pending,
+              tx.reference,
+              tx.amount,
+              tx.currency,
+              tx.payment_method,
+              tx.completed_at,
+            );
+            await refreshAppUser();
+            sessionStorage.removeItem(PENDING_SIGNUP_PREFIX + tx.reference);
+          } else if (firebaseUser) {
+            // Cas B: utilisateur déjà connecté — on étend simplement son accès.
+            const uid = appUser?.uid || firebaseUser.uid;
+            await grantCourseAccessAfterPayment(uid, courseSlug, tx);
+            await refreshAppUser();
+          } else {
+            // Cas C: ni utilisateur connecté, ni signup en attente (lien partagé, autre device)
+            // → on bloque la finalisation; on demande à se connecter.
+            setStatus('failed');
+            setErrorMessage(lang === 'fr'
+              ? 'Connectez-vous pour finaliser l\'activation de votre cours.'
+              : 'Sign in to finalize your course activation.');
+            return;
+          }
+
           const expiresAt = new Date();
           expiresAt.setDate(expiresAt.getDate() + 30);
           setDetails({
@@ -93,11 +185,7 @@ export const PaymentSuccessPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [reference, firebaseUser, appUser, courseFromQuery]);
-
-  if (!firebaseUser) {
-    return <Navigate to={`/login?next=${encodeURIComponent(`/payment/success?reference=${reference}&course=${courseFromQuery || ''}`)}`} replace />;
-  }
+  }, [reference, firebaseUser, appUser, courseFromQuery, lang, refreshAppUser]);
 
   const cert = details?.courseSlug
     ? certifications.find(c => c.slug === details.courseSlug)

@@ -1,13 +1,14 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Layout } from './components/layout';
 import { ProtectedRoute, AdminRoute } from './components/auth';
-import { HomePage, TopicsPage, TopicDetailPage, QuestionPage, ExamPage, LoginPage, AdminPage, DashboardPage, ExamReviewPage, PrivacyAndTermsPage, PaymentSuccessPage, PaymentErrorPage } from './pages';
+import { HomePage, TopicsPage, TopicDetailPage, QuestionPage, ExamPage, LoginPage, AdminPage, DashboardPage, ExamReviewPage, PrivacyAndTermsPage, PaymentSuccessPage, PaymentErrorPage, SubscribePage } from './pages';
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/subscribe" element={<SubscribePage />} />
         <Route path="/privacy" element={<PrivacyAndTermsPage />} />
         <Route path="/payment/success" element={<PaymentSuccessPage />} />
         <Route path="/payment/error" element={<PaymentErrorPage />} />

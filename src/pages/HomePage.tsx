@@ -357,8 +357,8 @@ export const HomePage = () => {
                         {groupCerts.map((cert, certIndex) => {
                           const isAuthorized = !!appUser?.allowedCourses?.includes(cert.slug as CertificationSlug);
                           const dest = appUser
-                            ? (isAuthorized ? `/topics?cert=${cert.slug}` : `/login?cert=${cert.slug}`)
-                            : `/login?cert=${cert.slug}`;
+                            ? (isAuthorized ? `/topics?cert=${cert.slug}` : `/topics?cert=${cert.slug}&pay=1`)
+                            : `/subscribe?cert=${cert.slug}`;
                           const colorMap: Record<string, string> = {
                             primary: 'bg-primary-500/15 text-primary-300 border-primary-500/25 hover:bg-primary-500/30 hover:border-primary-400/40 hover:shadow-[0_0_12px_rgba(59,130,246,0.15)]',
                             success: 'bg-primary-500/15 text-primary-300 border-primary-500/25 hover:bg-primary-500/30 hover:border-primary-400/40 hover:shadow-[0_0_12px_rgba(59,130,246,0.15)]',
