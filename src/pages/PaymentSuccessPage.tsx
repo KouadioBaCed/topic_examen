@@ -267,20 +267,34 @@ export const PaymentSuccessPage = () => {
     e.preventDefault();
     if (!lastTx || !details) return;
     setClaimError(null);
+    const enteredEmail = claimEmail.trim().toLowerCase();
+
     if (claimPassword.length < 6) {
       setClaimError(lang === 'fr' ? 'Mot de passe trop court (6 caractères min).' : 'Password too short (min 6 chars).');
       return;
     }
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(claimEmail)) {
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(enteredEmail)) {
       setClaimError(lang === 'fr' ? 'Email invalide.' : 'Invalid email.');
       return;
     }
+
+    // SÉCURITÉ : si la transaction a été créée avec un email (metadata),
+    // on n'autorise la réclamation que pour cet email. Empêche le vol d'accès
+    // par un tiers ayant intercepté la référence MTX-…
+    const expectedEmail = (lastTx.metadata?.email || '').toLowerCase().trim();
+    if (expectedEmail && expectedEmail !== enteredEmail) {
+      setClaimError(lang === 'fr'
+        ? "Cet email ne correspond pas au paiement. Saisissez l'email utilisé lors de la souscription."
+        : 'This email does not match the payment. Enter the email used during subscription.');
+      return;
+    }
+
     setClaimSubmitting(true);
     try {
       await createOrLoginAndGrantAccess(
-        claimEmail.trim().toLowerCase(),
+        enteredEmail,
         claimPassword,
-        claimDisplayName.trim() || claimEmail.split('@')[0],
+        claimDisplayName.trim() || enteredEmail.split('@')[0],
         details.courseSlug,
         lastTx.reference,
         lastTx.amount,
@@ -469,10 +483,18 @@ export const PaymentSuccessPage = () => {
                     value={claimEmail}
                     onChange={(e) => setClaimEmail(e.target.value)}
                     required
-                    className="input pl-10 py-2.5"
+                    readOnly={!!lastTx?.metadata?.email}
+                    className={`input pl-10 py-2.5 ${lastTx?.metadata?.email ? 'cursor-not-allowed opacity-80' : ''}`}
                     autoComplete="email"
                   />
                 </div>
+                {lastTx?.metadata?.email && (
+                  <p className="mt-1 text-[11px] text-dark-500 dark:text-dark-400">
+                    {lang === 'fr'
+                      ? "Email verrouillé : seul le titulaire de cet email peut activer le compte."
+                      : 'Email locked: only the owner of this email can activate the account.'}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-dark-700 dark:text-dark-300 mb-1">{labels.claimNameLabel}</label>

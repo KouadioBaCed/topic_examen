@@ -13,6 +13,7 @@ import {
   COURSE_PRICE_XOF,
   createCoursePayment,
   formatPriceXof,
+  isSafeRedirectUrl,
   PaymentApiError,
 } from '../services/payment';
 import type { CertificationSlug } from '../types';
@@ -195,8 +196,10 @@ export const SubscribePage = () => {
       sessionStorage.setItem(PENDING_SIGNUP_PREFIX + res.reference, JSON.stringify(pending));
 
       const target = res.checkout_url || res.payment_url;
-      if (!target) {
-        throw new Error('checkout_url missing');
+      if (!target || !isSafeRedirectUrl(target)) {
+        // Si l'URL de redirection n'est pas sur un domaine GeniusPay/Wave/Paystack reconnu,
+        // on refuse — les données du formulaire sont gardées en sessionStorage pour retry manuel.
+        throw new Error('Unsafe or missing redirect URL');
       }
       window.location.href = target;
     } catch (err) {

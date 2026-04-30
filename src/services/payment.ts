@@ -53,6 +53,28 @@ export class PaymentApiError extends Error {
   }
 }
 
+// Domaines autorisés pour la redirection post-création (anti open-redirect).
+// Toute autre origine retournée par l'API sera rejetée côté client.
+const ALLOWED_REDIRECT_HOSTS = [
+  'pay.genius.ci',
+  'genius.ci',
+  'wave.com',
+  'pay.wave.com',
+  'paystack.com',
+  'checkout.paystack.com',
+];
+
+export function isSafeRedirectUrl(url: string | undefined | null): boolean {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    if (u.protocol !== 'https:') return false;
+    return ALLOWED_REDIRECT_HOSTS.some(host => u.hostname === host || u.hostname.endsWith(`.${host}`));
+  } catch {
+    return false;
+  }
+}
+
 export async function createCoursePayment(params: CreatePaymentParams): Promise<CreatePaymentResponse> {
   let res: Response;
   try {

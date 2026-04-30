@@ -1,0 +1,105 @@
+rules_version = '2';
+
+// Sécurité Firestore — sans ces règles, n'importe qui ayant la apiKey publique
+// (donc n'importe quel visiteur du site) peut lire / écrire toute la base.
+//
+// Modèle :
+//  - Lecture : un utilisateur ne lit que son propre doc /users/{uid} (les
+//    admins lisent tout).
+//  - Création initiale du doc utilisateur (juste après createUserWithEmailAndPassword) :
+//    autorisée pour le titulaire du uid, role forcé à 'user', allowedCourses
+//    limité à 1 entrée max (le cours qu'il vient de payer).
+//  - Mise à jour : la plupart des champs sont verrouillés (role, isActive,
+//    expiresAt). allowedCourses et courseSubscriptions peuvent être étendus
+//    d'UN seul cours à la fois, ce qui correspond à un nouveau paiement.
+//  - examResults : un utilisateur lit/écrit uniquement ses propres résultats.
+//  - Tout le reste : refusé.
+//
+// LIMITATION CONNUE : ces règles ne valident pas que l'extension de
+// allowedCourses correspond bien à un paiement vérifié. Pour un blindage
+// total, il faut migrer le grant vers une Netlify Function utilisant
+// firebase-admin (custom claims ou écriture via Admin SDK qui bypass
+// les rules). Avec les règles actuelles, un attaquant peut au pire
+// s'attribuer 1 cours par requête depuis sa propre session — il ne peut
+// pas se donner les 14 cours d'un coup, ni élever son rôle, ni lire les
+// données d'autrui.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── helpers ─────────────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Champs verrouillés en update pour les non-admins.
+    function lockedFields() {
+      return ['role', 'isActive', 'expiresAt', 'createdAt', 'email', 'uid'];
+    }
+    function lockedFieldsUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(lockedFields());
+    }
+
+    // Calcule de combien grandit la liste allowedCourses entre l'ancien et
+    // le nouveau document. <= 1 → extension "normale" suite à un paiement.
+    function allowedCoursesGrowth() {
+      return request.resource.data.allowedCourses.size() - resource.data.allowedCourses.size();
+    }
+    function courseSubscriptionsGrowth() {
+      return request.resource.data.courseSubscriptions.size() - resource.data.courseSubscriptions.size();
+    }
+
+    // ── /users/{uid} ────────────────────────────────────────────────────
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+
+      // Création initiale : juste après createUserWithEmailAndPassword.
+      // On force role=user et on limite allowedCourses à 1 cours max
+      // (le cours payé qui a déclenché l'inscription).
+      allow create: if isOwner(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.role == 'user'
+        && (!('allowedCourses' in request.resource.data)
+            || request.resource.data.allowedCourses.size() <= 1)
+        && (!('courseSubscriptions' in request.resource.data)
+            || request.resource.data.courseSubscriptions.size() <= 1);
+
+      // Mise à jour :
+      //  - admin : tout
+      //  - propriétaire : champs verrouillés inchangés ET extension
+      //    de allowedCourses/courseSubscriptions d'au plus 1 entrée
+      //    (un nouveau paiement par requête).
+      allow update: if isAdmin()
+        || (isOwner(uid)
+            && lockedFieldsUnchanged()
+            && allowedCoursesGrowth() <= 1
+            && courseSubscriptionsGrowth() <= 1);
+
+      // Suppression : admin uniquement.
+      allow delete: if isAdmin();
+    }
+
+    // ── /examResults/{id} ───────────────────────────────────────────────
+    match /examResults/{resultId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid && request.resource.data.userId == resource.data.userId);
+      allow delete: if isAdmin();
+    }
+
+    // ── tout le reste : refusé par défaut ────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

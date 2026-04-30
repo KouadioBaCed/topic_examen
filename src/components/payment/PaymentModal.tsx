@@ -7,6 +7,7 @@ import {
   COURSE_PRICE_XOF,
   createCoursePayment,
   formatPriceXof,
+  isSafeRedirectUrl,
   PaymentApiError,
 } from '../../services/payment';
 
@@ -85,8 +86,8 @@ export const PaymentModal = ({ certification, onClose }: PaymentModalProps) => {
         JSON.stringify({ courseSlug: certification.slug, uid: appUser.uid }),
       );
       const target = res.checkout_url || res.payment_url;
-      if (!target) {
-        throw new Error('checkout_url missing');
+      if (!target || !isSafeRedirectUrl(target)) {
+        throw new Error('Unsafe or missing redirect URL');
       }
       window.location.href = target;
     } catch (err) {
