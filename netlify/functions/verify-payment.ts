@@ -85,5 +85,3 @@ function json(body: unknown, status = 200) {
     },
   });
 }
-
-export const config = { path: '/api/payment/verify' };
