@@ -67,6 +67,11 @@ export default async (req: Request) => {
       uid: body.uid,
       course_slug: body.courseSlug,
       plan: 'monthly',
+      // Stocké en metadata pour permettre la récupération du compte si la sessionStorage
+      // côté navigateur est perdue entre la redirection et le retour. Le mot de passe
+      // n'est JAMAIS envoyé à GeniusPay (uniquement utilisé côté client).
+      email: body.email || '',
+      display_name: body.displayName || '',
     },
   };
 
