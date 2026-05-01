@@ -1,10 +1,17 @@
 // Netlify Function: vérification d'un paiement GeniusPay par référence.
 // Usage: GET /api/payment/verify?reference=MTX-XXXX  ou  reference=TXN-XXXX
+//
+// La référence URL renvoyée par GeniusPay (TXN-…) n'est pas reconnue par leur
+// endpoint /payments/{id} : seule la ref marchand (MTX-…) qu'on a obtenue à la
+// création fonctionne. On lit donc le cookie `gpRef` posé par create-payment
+// comme source d'autorité, et on retombe sur la ref URL en dernier recours.
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map(s => s.trim())
   .filter(Boolean);
+
+const REF_RE = /^[A-Z]{2,5}-[A-Z0-9]{4,60}$/i;
 
 function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return false;
@@ -18,18 +25,65 @@ function corsHeaders(origin: string | null) {
     'Access-Control-Allow-Origin': allow,
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Credentials': 'true',
     Vary: 'Origin',
   };
 }
 
-function json(body: unknown, status = 200, origin: string | null = null) {
+function json(body: unknown, status = 200, origin: string | null = null, extraHeaders: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
       'Content-Type': 'application/json',
       ...corsHeaders(origin),
+      ...extraHeaders,
     },
   });
+}
+
+function getCookie(req: Request, name: string): string {
+  const raw = req.headers.get('cookie') || '';
+  for (const part of raw.split(';')) {
+    const [k, ...rest] = part.trim().split('=');
+    if (k === name) return decodeURIComponent(rest.join('='));
+  }
+  return '';
+}
+
+interface GeniusPayTx {
+  reference: string;
+  amount: number;
+  currency: string;
+  status: string;
+  payment_method?: string | null;
+  metadata?: Record<string, string>;
+  completed_at?: string | null;
+  created_at?: string;
+}
+
+async function fetchPayment(
+  baseUrl: string,
+  ref: string,
+  apiKey: string,
+  apiSecret: string,
+): Promise<{ ok: boolean; status: number; tx?: GeniusPayTx; error?: { code: string; message: string } }> {
+  const upstream = await fetch(`${baseUrl}/payments/${encodeURIComponent(ref)}`, {
+    method: 'GET',
+    headers: {
+      'X-API-Key': apiKey,
+      'X-API-Secret': apiSecret,
+      Accept: 'application/json',
+    },
+  });
+  const data = await upstream.json().catch(() => null);
+  if (upstream.ok && data?.success) {
+    return { ok: true, status: upstream.status, tx: data.data as GeniusPayTx };
+  }
+  return {
+    ok: false,
+    status: upstream.status || 404,
+    error: data?.error || { code: 'TRANSACTION_NOT_FOUND', message: 'Transaction not found' },
+  };
 }
 
 export default async (req: Request) => {
@@ -56,52 +110,55 @@ export default async (req: Request) => {
   }
 
   const url = new URL(req.url);
-  const reference = url.searchParams.get('reference');
+  const urlRef = url.searchParams.get('reference') || '';
+  const cookieRef = getCookie(req, 'gpRef');
 
-  // GeniusPay émet des références sous plusieurs préfixes selon le canal
-  // (MTX- pour les paiements marchand initiés via l'API, TXN- pour les transactions
-  // côté checkout, etc.). On accepte tout préfixe alpha de 2-5 lettres pour rester
-  // tolérant aux nouveaux formats sans rouvrir la porte aux injections.
-  if (!reference || !/^[A-Z]{2,5}-[A-Z0-9]{4,60}$/i.test(reference)) {
+  // Construit la liste des refs à essayer. On commence par la ref URL (ce que le
+  // visiteur demande explicitement) pour éviter qu'un cookie résiduel ne prenne
+  // le pas sur une consultation d'un autre paiement. Si la ref URL échoue (cas
+  // où GeniusPay redirige avec un TXN-… non reconnu par leur API), on retombe
+  // sur le cookie marchand `gpRef` posé par create-payment.
+  const candidates: string[] = [];
+  if (urlRef && REF_RE.test(urlRef)) candidates.push(urlRef);
+  if (cookieRef && REF_RE.test(cookieRef) && cookieRef !== urlRef) candidates.push(cookieRef);
+
+  if (candidates.length === 0) {
     return json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'A valid reference is required' } }, 422, origin);
   }
 
+  let lastError: { code: string; message: string } | null = null;
+  let lastStatus = 404;
+
   try {
-    const upstream = await fetch(`${baseUrl}/payments/${encodeURIComponent(reference)}`, {
-      method: 'GET',
-      headers: {
-        'X-API-Key': apiKey,
-        'X-API-Secret': apiSecret,
-        Accept: 'application/json',
-      },
-    });
-
-    const data = await upstream.json().catch(() => null);
-    if (!upstream.ok || !data?.success) {
-      return json(
-        {
-          success: false,
-          error: data?.error || { code: 'TRANSACTION_NOT_FOUND', message: 'Transaction not found' },
-        },
-        upstream.status || 404,
-        origin,
-      );
+    for (const ref of candidates) {
+      const r = await fetchPayment(baseUrl, ref, apiKey, apiSecret);
+      if (r.ok && r.tx) {
+        // Succès : on efface le cookie pour ne pas qu'une ref périmée traîne sur
+        // d'autres parcours du même navigateur (ex : second achat).
+        const clearCookie = 'gpRef=; Path=/; Max-Age=0; SameSite=Lax; Secure; HttpOnly';
+        return json(
+          {
+            success: true,
+            data: {
+              reference: r.tx.reference,
+              amount: r.tx.amount,
+              currency: r.tx.currency,
+              status: r.tx.status,
+              payment_method: r.tx.payment_method,
+              metadata: r.tx.metadata || {},
+              completed_at: r.tx.completed_at,
+              created_at: r.tx.created_at,
+            },
+          },
+          200,
+          origin,
+          { 'Set-Cookie': clearCookie },
+        );
+      }
+      lastError = r.error || lastError;
+      lastStatus = r.status || lastStatus;
     }
-
-    const tx = data.data;
-    return json({
-      success: true,
-      data: {
-        reference: tx.reference,
-        amount: tx.amount,
-        currency: tx.currency,
-        status: tx.status,
-        payment_method: tx.payment_method,
-        metadata: tx.metadata || {},
-        completed_at: tx.completed_at,
-        created_at: tx.created_at,
-      },
-    }, 200, origin);
+    return json({ success: false, error: lastError || { code: 'TRANSACTION_NOT_FOUND', message: 'Transaction not found' } }, lastStatus, origin);
   } catch (err) {
     return json({
       success: false,

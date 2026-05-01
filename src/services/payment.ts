@@ -81,6 +81,9 @@ export async function createCoursePayment(params: CreatePaymentParams): Promise<
     res = await fetch('/api/payment/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      // `same-origin` est le défaut, mais on l'explicite : la fonction pose un
+      // cookie `gpRef` que verify-payment relira ensuite.
+      credentials: 'same-origin',
       body: JSON.stringify({
         ...params,
         origin: window.location.origin,
@@ -119,7 +122,11 @@ export async function createCoursePayment(params: CreatePaymentParams): Promise<
 }
 
 export async function verifyCoursePayment(reference: string): Promise<VerifyPaymentResponse> {
-  const res = await fetch(`/api/payment/verify?reference=${encodeURIComponent(reference)}`);
+  const res = await fetch(`/api/payment/verify?reference=${encodeURIComponent(reference)}`, {
+    // Indispensable pour que le cookie `gpRef` posé par create-payment soit envoyé
+    // à verify-payment, qui s'en sert comme ref marchand de fallback.
+    credentials: 'same-origin',
+  });
   const data = await res.json().catch(() => null);
   if (!res.ok || !data?.success) {
     const err: ApiError = data?.error || { code: 'UNKNOWN', message: 'Erreur inconnue' };

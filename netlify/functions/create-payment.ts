@@ -40,16 +40,18 @@ function corsHeaders(origin: string | null) {
     'Access-Control-Allow-Origin': allow,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Credentials': 'true',
     Vary: 'Origin',
   };
 }
 
-function json(body: unknown, status = 200, origin: string | null = null) {
+function json(body: unknown, status = 200, origin: string | null = null, extraHeaders: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
       'Content-Type': 'application/json',
       ...corsHeaders(origin),
+      ...extraHeaders,
     },
   });
 }
@@ -172,6 +174,15 @@ export default async (req: Request) => {
       );
     }
 
+    // Cookie HttpOnly avec la ref marchand : verify-payment l'utilisera comme
+    // source d'autorité. Survit à la redirection vers GeniusPay (SameSite=Lax)
+    // et reste disponible même si localStorage du navigateur est perdu pendant
+    // l'aller-retour vers une app mobile money (Wave, Orange Money, etc.).
+    // Max-Age 1h : assez large pour la finalisation, assez court pour ne pas
+    // s'accumuler entre achats.
+    const merchantRef = String(data.data.reference || '');
+    const setCookie = `gpRef=${encodeURIComponent(merchantRef)}; Path=/; Max-Age=3600; SameSite=Lax; Secure; HttpOnly`;
+
     return json({
       success: true,
       data: {
@@ -183,7 +194,7 @@ export default async (req: Request) => {
         payment_url: data.data.payment_url || data.data.checkout_url,
         expires_at: data.data.expires_at,
       },
-    }, 200, origin);
+    }, 200, origin, merchantRef ? { 'Set-Cookie': setCookie } : {});
   } catch (err) {
     return json({
       success: false,

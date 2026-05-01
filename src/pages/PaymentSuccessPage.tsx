@@ -114,11 +114,11 @@ export const PaymentSuccessPage = () => {
   const [claimSubmitting, setClaimSubmitting] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
 
-  // GeniusPay redirige avec un ID de checkout (TXN-...) qui n'est pas reconnu par
-  // leur endpoint /payments/{id} — celui-ci attend la ref marchand (MTX-...) qu'on
-  // a sauvegardée au moment du createCoursePayment. On préfère donc la ref stockée
-  // localement, et on retombe sur l'URL si elle n'existe pas (ex : retour depuis
-  // un autre navigateur).
+  // GeniusPay peut rediriger avec un ID de checkout (TXN-…) que leur endpoint
+  // /payments/{id} ne reconnaît pas — la résolution TXN→MTX est gérée côté
+  // serveur dans verify-payment via le cookie HttpOnly `gpRef`. Le client se
+  // contente donc de transmettre la ref URL, et localStorage sert seulement de
+  // dernier filet si jamais le cookie a été bloqué (Safari ITP, navigateur tiers).
   const urlReference = searchParams.get('reference')
     || searchParams.get('payment_reference')
     || searchParams.get('ref')
@@ -126,7 +126,7 @@ export const PaymentSuccessPage = () => {
   const storedReference = (() => {
     try { return localStorage.getItem('lastPaymentReference') || ''; } catch { return ''; }
   })();
-  const reference = storedReference || urlReference;
+  const reference = urlReference || storedReference;
   const courseFromQuery = searchParams.get('course') as CertificationSlug | null;
 
   const finalize = useCallback(async (tx: VerifyPaymentResponse, courseSlug: CertificationSlug) => {
