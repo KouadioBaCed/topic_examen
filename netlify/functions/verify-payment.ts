@@ -1,5 +1,5 @@
 // Netlify Function: vérification d'un paiement GeniusPay par référence.
-// Usage: GET /api/payment/verify?reference=MTX-XXXX
+// Usage: GET /api/payment/verify?reference=MTX-XXXX  ou  reference=TXN-XXXX
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
@@ -58,7 +58,11 @@ export default async (req: Request) => {
   const url = new URL(req.url);
   const reference = url.searchParams.get('reference');
 
-  if (!reference || !/^MTX-[A-Z0-9]{4,40}$/i.test(reference)) {
+  // GeniusPay émet des références sous plusieurs préfixes selon le canal
+  // (MTX- pour les paiements marchand initiés via l'API, TXN- pour les transactions
+  // côté checkout, etc.). On accepte tout préfixe alpha de 2-5 lettres pour rester
+  // tolérant aux nouveaux formats sans rouvrir la porte aux injections.
+  if (!reference || !/^[A-Z]{2,5}-[A-Z0-9]{4,60}$/i.test(reference)) {
     return json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'A valid reference is required' } }, 422, origin);
   }
 
