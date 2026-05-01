@@ -34,7 +34,20 @@
       "Bash(node -e \":*)",
       "Bash(rm -rf node_modules/.vite)",
       "Bash(pkill -f \"vite\")",
-      "Bash(taskkill //F //IM \"node.exe\")"
+      "Bash(taskkill //F //IM \"node.exe\")",
+      "Bash(py --version)",
+      "Bash(python *)",
+      "Bash(pip install *)",
+      "Bash(git ls-tree *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(curl -sS \"https://topic-exam.netlify.app/api/payment/verify?reference=MTX-WJ8N2WETE0\")",
+      "Bash(curl -sS \"https://topic-exams.netlify.app/api/payment/verify?reference=MTX-TEST\")",
+      "Bash(curl -sS -L \"https://topic-exams.netlify.app/\" -o /tmp/page.html)",
+      "Read(//tmp/**)",
+      "Bash(curl -sS \"https://topic-exams.netlify.app/assets/index-vLOMCQMe.js\" -o /tmp/bundle.js)",
+      "Bash(curl -sS \"https://topic-exams.netlify.app/assets/index-vLOMCQMe.js\")"
     ],
     "deny": [],
     "ask": []
