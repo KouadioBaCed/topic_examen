@@ -194,6 +194,10 @@ export const SubscribePage = () => {
         tempUid,
       };
       sessionStorage.setItem(PENDING_SIGNUP_PREFIX + res.reference, JSON.stringify(pending));
+      // Sauvegarde la ref marchand (MTX-...) sur localStorage : GeniusPay redirige avec
+      // un ID checkout (TXN-...) que leur API ne reconnaît pas. La page success utilisera
+      // cette ref-ci pour interroger /payments/{id}.
+      try { localStorage.setItem('lastPaymentReference', res.reference); } catch { /* storage may be unavailable in private mode */ }
 
       const target = res.checkout_url || res.payment_url;
       if (!target || !isSafeRedirectUrl(target)) {

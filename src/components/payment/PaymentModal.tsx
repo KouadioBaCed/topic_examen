@@ -85,6 +85,10 @@ export const PaymentModal = ({ certification, onClose }: PaymentModalProps) => {
         `payment:${res.reference}`,
         JSON.stringify({ courseSlug: certification.slug, uid: appUser.uid }),
       );
+      // Sauvegarde la ref marchand (MTX-...) sur localStorage : GeniusPay redirige avec
+      // un ID checkout (TXN-...) que leur API ne reconnaît pas. La page success utilisera
+      // cette ref-ci pour interroger /payments/{id}.
+      try { localStorage.setItem('lastPaymentReference', res.reference); } catch { /* storage may be unavailable in private mode */ }
       const target = res.checkout_url || res.payment_url;
       if (!target || !isSafeRedirectUrl(target)) {
         throw new Error('Unsafe or missing redirect URL');
