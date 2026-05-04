@@ -12,9 +12,7 @@ interface CreatePaymentBody {
   paymentMethod?: 'wave' | 'orange_money' | 'mtn_money' | 'moov_money' | 'card' | 'checkout';
 }
 
-// TEST PRODUCTION — montant abaissé temporairement au minimum GeniusPay (200 XOF).
-// Remettre à 200000 une fois les tests validés.
-const COURSE_PRICE = 200;
+const COURSE_PRICE = 200000;
 const ALLOWED_METHODS = ['wave', 'orange_money', 'mtn_money', 'moov_money', 'card'] as const;
 
 // Whitelist des slugs de cours autorisés. Doit refléter src/types/index.ts (CertificationSlug).
