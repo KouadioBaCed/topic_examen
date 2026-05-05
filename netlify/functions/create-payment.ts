@@ -12,7 +12,7 @@ interface CreatePaymentBody {
   paymentMethod?: 'wave' | 'orange_money' | 'mtn_money' | 'moov_money' | 'card' | 'checkout';
 }
 
-const COURSE_PRICE = 200000;
+const COURSE_PRICE = 59900;
 const ALLOWED_METHODS = ['wave', 'orange_money', 'mtn_money', 'moov_money', 'card'] as const;
 
 // Whitelist des slugs de cours autorisés. Doit refléter src/types/index.ts (CertificationSlug).

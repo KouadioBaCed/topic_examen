@@ -3,7 +3,7 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 // Doit rester aligné avec COURSE_PRICE dans netlify/functions/create-payment.ts.
-export const COURSE_PRICE_XOF = 200000;
+export const COURSE_PRICE_XOF = 59900;
 export const SUBSCRIPTION_DURATION_DAYS = 30;
 
 export interface CreatePaymentParams {
